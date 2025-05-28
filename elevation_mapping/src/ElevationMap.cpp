@@ -46,6 +46,7 @@ ElevationMap::ElevationMap(ros::NodeHandle nodeHandle)
   const Parameters parameters{parameters_.getData()};
 
   elevationMapFusedPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("elevation_map", 1);
+  processingFinishedPublisher_ = nodeHandle_.advertise<std_msgs::Header>("processing_finished", 1);
   if (!parameters.underlyingMapTopic_.empty()) {
     underlyingMapSubscriber_ = nodeHandle_.subscribe(parameters.underlyingMapTopic_, 1, &ElevationMap::underlyingMapCallback, this);
   }

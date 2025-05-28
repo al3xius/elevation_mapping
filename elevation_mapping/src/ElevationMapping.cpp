@@ -315,6 +315,11 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
                                           const SensorProcessorBase::Ptr& sensorProcessor_) {
   const Parameters parameters{parameters_.getData()};
   ROS_DEBUG("Processing data from: %s", pointCloudMsg->header.frame_id.c_str());
+
+  std_msgs::Header msg = std_msgs::Header();
+  msg.stamp = pointCloudMsg->header.stamp;
+  msg.frame_id = map_.getFrameId();
+
   if (!parameters.updatesEnabled_) {
     ROS_WARN_THROTTLE(10, "Updating of elevation map is disabled. (Warning message is throttled, 10s.)");
     if (publishPointCloud) {
@@ -331,6 +336,7 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
 
     if (currentPointCloudTime < oldestPoseTime) {
       ROS_WARN_THROTTLE(5, "No corresponding point cloud and pose are found. Waiting for first match. (Warning message is throttled, 5s.)");
+      map_.processingFinishedPublisher_.publish(msg);
       return;
     } else {
       ROS_INFO("First corresponding point cloud and pose found, elevation mapping started. ");
@@ -365,6 +371,7 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
       } else {
         ROS_ERROR("Could not get pose information from robot for time %f. Buffer empty?", lastPointCloudUpdateTime_.toSec());
       }
+      map_.processingFinishedPublisher_.publish(msg);
       return;
     }
     robotPoseCovariance = Eigen::Map<const Eigen::MatrixXd>(poseMessage->pose.covariance.data(), 6, 6);
@@ -377,10 +384,12 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
                                  pointCloudMsg->header.frame_id)) {
     if (!sensorProcessor_->isTfAvailableInBuffer()) {
       ROS_INFO_THROTTLE(10, "Waiting for tf transformation to be available. (Message is throttled, 10s.)");
+      map_.processingFinishedPublisher_.publish(msg);
       return;
     }
     ROS_ERROR_THROTTLE(10, "Point cloud could not be processed. (Throttled 10s)");
     resetMapUpdateTimer();
+    map_.processingFinishedPublisher_.publish(msg);
     return;
   }
 
@@ -389,10 +398,14 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
   // Update map location.
   updateMapLocation();
 
+  
+  
+
   // Update map from motion prediction.
   if (!updatePrediction(lastPointCloudUpdateTime_)) {
     ROS_ERROR("Updating process noise failed.");
     resetMapUpdateTimer();
+    map_.processingFinishedPublisher_.publish(msg);
     return;
   }
 
@@ -409,6 +422,7 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
                 Eigen::Affine3d(sensorProcessor_->transformationSensorToMap_))) {
     ROS_ERROR("Adding point cloud to elevation map failed.");
     resetMapUpdateTimer();
+    map_.processingFinishedPublisher_.publish(msg);
     return;
   }
 
@@ -422,6 +436,7 @@ void ElevationMapping::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr
   }
 
   resetMapUpdateTimer();
+  map_.processingFinishedPublisher_.publish(msg);
 }
 
 void ElevationMapping::mapUpdateTimerCallback(const ros::TimerEvent& /*unused*/) {

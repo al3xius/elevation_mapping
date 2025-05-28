@@ -300,6 +300,7 @@ class ElevationMap {
   //! ROS publishers. Publishing of the raw elevation map is handled by the postprocessing pool.
   ros::Publisher elevationMapFusedPublisher_;
   ros::Publisher visibilityCleanupMapPublisher_;
+  ros::Publisher processingFinishedPublisher_;
 
   //! Mutex lock for fused map.
   boost::recursive_mutex fusedMapMutex_;
